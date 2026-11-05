@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skills": {
+    "architect": {
+      "source": "officialgiftdev/giftdev-agent-skill",
+      "sourceType": "github",
+      "skillPath": "skills/architect/SKILL.md",
+      "computedHash": "1f833172ff489513296480bec30408c619e75efc0b898433773357c9ac6efd8f"
+    },
+    "bootstrap-components": {
+      "source": "ronnieiscoo/bootstrap-expert",
+      "sourceType": "github",
+      "skillPath": "plugins/bootstrap-expert/skills/bootstrap-components/SKILL.md",
+      "computedHash": "dfe036403934b2dc885e70a79dce7375a552236a03c645ca97c3a330f8481a00"
+    },
+    "imprint": {
+      "source": "officialgiftdev/giftdev-agent-skill",
+      "sourceType": "github",
+      "skillPath": "skills/imprint/SKILL.md",
+      "computedHash": "599c3c8ef9d97129584332206d663729b4b9a1a3ad1d68ec9b5b4ad5d4af51cf"
+    },
+    "mysql-schema": {
+      "source": "allenmuu/mysql-cli",
+      "sourceType": "github",
+      "skillPath": "skills/mysql-schema/SKILL.md",
+      "computedHash": "be7f8cfc6c4a6872230eb76c94a821383ed7e66456d879aabfafc87fdf6e91dd"
+    },
+    "php-pro": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/php-pro/SKILL.md",
+      "computedHash": "b69c9a5586579786acd35241cd5570cb8bc213797a0d7885743b1403dc4b6383"
+    },
+    "recover": {
+      "source": "officialgiftdev/giftdev-agent-skill",
+      "sourceType": "github",
+      "skillPath": "skills/recover/SKILL.md",
+      "computedHash": "9b928c32260584c2979d6194c36e21ba3c624fc99a95184009c14e8d764b3915"
+    },
+    "remember": {
+      "source": "officialgiftdev/giftdev-agent-skill",
+      "sourceType": "github",
+      "skillPath": "skills/remember/SKILL.md",
+      "computedHash": "77e6e96fd7745b14bbb07bda78e3b7d0c6f62a6dc3f4f44dff86d1b26539557f"
+    },
+    "review": {
+      "source": "officialgiftdev/giftdev-agent-skill",
+      "sourceType": "github",
+      "skillPath": "skills/review/SKILL.md",
+      "computedHash": "8e844766710747e8a3f62173e76b4228f8b4b1203e5db8c361bf5c7a138c5b3a"
+    }
+  }
+}
