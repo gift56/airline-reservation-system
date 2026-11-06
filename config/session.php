@@ -50,6 +50,24 @@ function app_is_valid_csrf_token(mixed $token): bool
         && hash_equals($_SESSION['_csrf_token'], $token);
 }
 
+function app_booking_return_path(mixed $value): ?string
+{
+    if (!is_string($value) || preg_match('/\Abook-flight\.php\?flight_id=([1-9][0-9]*)\z/', $value, $matches) !== 1) {
+        return null;
+    }
+
+    $flightId = filter_var(
+        $matches[1],
+        FILTER_VALIDATE_INT,
+        ['options' => ['min_range' => 1]]
+    );
+    if ($flightId === false) {
+        return null;
+    }
+
+    return 'book-flight.php?flight_id=' . $flightId;
+}
+
 /**
  * @param array{id: string, full_name: string, role: string} $identity
  */

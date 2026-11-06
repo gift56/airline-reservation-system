@@ -2,7 +2,7 @@
 
 A PHP and MariaDB project scaffold for an airline reservation system. The repository provides a PDO connection entry point, a MySQL/MariaDB schema for accounts, airports, scheduled flights, bookings, and passenger manifests, an ERD, and passenger registration/login with shared Bootstrap account UI.
 
-> **Current status:** The database schema, passenger registration/login, shared account UI, and administrator flight CRUD dashboard are implemented. Public flight search, booking, and booking history are not implemented yet.
+> **Current status:** The database schema, passenger registration/login, public flight search, passenger pending reservations, shared account UI, and administrator flight CRUD dashboard are implemented. Booking history and online payment are not implemented.
 
 ## Contents
 
@@ -14,6 +14,7 @@ A PHP and MariaDB project scaffold for an airline reservation system. The reposi
 - [Test the PDO connection from PowerShell](#test-the-pdo-connection-from-powershell)
 - [Verify the database](#verify-the-database)
 - [Authentication and sessions](#authentication-and-sessions)
+- [Public flight search and passenger reservations](#public-flight-search-and-passenger-reservations)
 - [Admin flight dashboard](#admin-flight-dashboard)
 - [Re-import behavior and safety](#re-import-behavior-and-safety)
 - [Troubleshooting](#troubleshooting)
@@ -171,9 +172,17 @@ Administrators can edit airport codes, names, cities, and countries from the Air
 
 ### Optional Nigerian demo seed
 
-After confirming `flights.ticket_price` exists, you can optionally select `airline_reservation` in phpMyAdmin, choose **Import**, select [`database/seeds/nigeria-flights.sql`](./database/seeds/nigeria-flights.sql), and run it. The seed includes Nigerian airports and 12 fictional domestic flight examples with NGN fares, using fixed demo dates. It is repeat-safe, does not overwrite existing airport/flight records, and is not run automatically by the application. These schedules and fares are not real airline inventory. You can instead add only the airports and flights you need from the dashboard forms; seed import is optional.
+After confirming `flights.ticket_price` exists, you can optionally select `airline_reservation` in phpMyAdmin, choose **Import**, select [`database/seeds/nigeria-flights.sql`](./database/seeds/nigeria-flights.sql), and run it. The seed includes Nigerian airports, 12 fictional older examples, and 168 rolling schedules across 12 domestic routes for the next 14 days. The rolling schedules are repeat-safe on the same day and do not overwrite existing airport or flight records. The seed is not run automatically by the application. These schedules and fares are fictional demo data, not real airline inventory. You can instead add only the airports and flights you need from the dashboard forms; seed import is optional.
 
 The admin flight list shows 10 flights per page with a result range and accessible page controls. Editing or deleting a flight preserves the current list page.
+
+## Public flight search and passenger reservations
+
+The public landing page lists upcoming scheduled flights with a positive fare and available seats. Visitors can filter flights by route, date, fare, and time. Flight cards show fares in Nigerian naira (`₦`).
+
+Selecting **Book flight** opens a reservation form. A passenger must sign in (or register and then sign in) to reserve 1–6 travelers; the selected flight is retained through that flow. Reservations are saved with `pending` status and one passenger-manifest row per traveler. Seat capacity is checked again inside a transaction before the reservation is created.
+
+This is a reservation request only: the application does not collect payment details, charge a card, or issue a paid/confirmed ticket. Booking history and online payment are not currently implemented.
 
 ## Re-import behavior and safety
 
@@ -208,4 +217,4 @@ Read the database server's complete error under **MySQL said**. phpMyAdmin's sta
 
 ## Current project limitations
 
-This repository currently contains the database/schema foundation, PDO connection setup, passenger registration/login with role-aware sessions, and administrator flight management. Public flight search, reservations, and booking history remain future implementation work. The root URL `http://localhost/airline-reservation-system/` is not yet a completed application entry point.
+This repository currently contains the database/schema foundation, PDO connection setup, passenger registration/login with role-aware sessions, public flight search and pending reservations, and administrator flight management. Booking history and online payment remain future implementation work.

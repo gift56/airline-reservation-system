@@ -23,7 +23,13 @@ $pageDescription = isset($pageDescription) && is_string($pageDescription)
         integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
         crossorigin="anonymous"
     >
+    <link
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+        rel="stylesheet"
+        crossorigin="anonymous"
+    >
     <link rel="stylesheet" href="assets/css/auth.css">
+    <link rel="stylesheet" href="assets/css/flight-search.css">
 </head>
 <body>
 <?php require __DIR__ . '/navbar.php'; ?>

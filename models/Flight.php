@@ -9,6 +9,19 @@ use PDO;
 
 final class Flight
 {
+    private const AVAILABLE_SEATS_JOIN = 'LEFT JOIN (
+        SELECT bookings.flight_id,
+               SUM(GREATEST(COALESCE(manifest.passenger_count, 0), 1)) AS occupied_seats
+        FROM bookings
+        LEFT JOIN (
+            SELECT booking_id, COUNT(*) AS passenger_count
+            FROM passengers_manifest
+            GROUP BY booking_id
+        ) manifest ON manifest.booking_id = bookings.id
+        WHERE bookings.status IN (\'pending\', \'confirmed\')
+        GROUP BY bookings.flight_id
+    ) occupancy ON occupancy.flight_id = f.id';
+
     public function __construct(private PDO $pdo)
     {
     }
@@ -183,6 +196,174 @@ final class Flight
     public function countFlights(): int
     {
         return (int) $this->pdo->query('SELECT COUNT(*) FROM flights')->fetchColumn();
+    }
+
+    /**
+     * @param array{
+     *     min_price?: string,
+     *     max_price?: string,
+     *     departure_after?: string,
+     *     departure_before?: string,
+     *     arrival_after?: string,
+     *     arrival_before?: string,
+     *     sort?: string
+     * } $filters
+     * @return list<array{
+     *     id: string,
+     *     flight_number: string,
+     *     departure_at: string,
+     *     arrival_at: string,
+     *     ticket_price: string,
+     *     remaining_seats: string,
+     *     origin_iata_code: string,
+     *     origin_city: string,
+     *     destination_iata_code: string,
+     *     destination_city: string
+     * }>
+     */
+    public function searchAvailableFlights(
+        int $originAirportId,
+        int $destinationAirportId,
+        string $travelDate,
+        array $filters = []
+    ): array {
+        if ($originAirportId < 1 || $destinationAirportId < 1 || $originAirportId === $destinationAirportId) {
+            throw new InvalidArgumentException('Flight search airports are invalid.');
+        }
+
+        $day = \DateTimeImmutable::createFromFormat('!Y-m-d', $travelDate);
+        $dateErrors = \DateTimeImmutable::getLastErrors();
+        if (
+            $day === false
+            || ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0))
+            || $day->format('Y-m-d') !== $travelDate
+        ) {
+            throw new InvalidArgumentException('Flight search date is invalid.');
+        }
+
+        $conditions = [
+            'f.origin_airport_id = :origin_id',
+            'f.destination_airport_id = :destination_id',
+            'f.departure_at >= :day_start',
+            'f.departure_at < :day_end',
+            'f.departure_at > NOW()',
+            "f.status = 'scheduled'",
+            'f.ticket_price > 0',
+            'f.seat_capacity > COALESCE(occupancy.occupied_seats, 0)',
+        ];
+        $parameters = [
+            'origin_id' => $originAirportId,
+            'destination_id' => $destinationAirportId,
+            'day_start' => $day->format('Y-m-d 00:00:00'),
+            'day_end' => $day->modify('+1 day')->format('Y-m-d 00:00:00'),
+        ];
+
+        $optionalConditions = [
+            'min_price' => 'f.ticket_price >= :min_price',
+            'max_price' => 'f.ticket_price <= :max_price',
+            'departure_after' => 'TIME(f.departure_at) >= :departure_after',
+            'departure_before' => 'TIME(f.departure_at) <= :departure_before',
+            'arrival_after' => 'TIME(f.arrival_at) >= :arrival_after',
+            'arrival_before' => 'TIME(f.arrival_at) <= :arrival_before',
+        ];
+        foreach ($optionalConditions as $filter => $condition) {
+            if (isset($filters[$filter]) && $filters[$filter] !== '') {
+                $conditions[] = $condition;
+                $parameters[$filter] = $filters[$filter];
+            }
+        }
+
+        $orderBy = ($filters['sort'] ?? 'price') === 'departure'
+            ? 'f.departure_at ASC, f.ticket_price ASC, f.flight_number ASC'
+            : 'f.ticket_price ASC, f.departure_at ASC, f.flight_number ASC';
+
+        $statement = $this->pdo->prepare(
+            'SELECT f.id, f.flight_number, f.departure_at, f.arrival_at, f.ticket_price,
+                    f.seat_capacity - COALESCE(occupancy.occupied_seats, 0) AS remaining_seats,
+                    origin.iata_code AS origin_iata_code, origin.city AS origin_city,
+                    destination.iata_code AS destination_iata_code,
+                    destination.city AS destination_city
+             FROM flights f
+             INNER JOIN airports origin ON origin.id = f.origin_airport_id
+             INNER JOIN airports destination ON destination.id = f.destination_airport_id
+             ' . self::AVAILABLE_SEATS_JOIN . '
+             WHERE ' . implode(' AND ', $conditions) . '
+             ORDER BY ' . $orderBy
+        );
+        $statement->execute($parameters);
+
+        return array_map(
+            static fn (array $flight): array => [
+                'id' => (string) $flight['id'],
+                'flight_number' => (string) $flight['flight_number'],
+                'departure_at' => (string) $flight['departure_at'],
+                'arrival_at' => (string) $flight['arrival_at'],
+                'ticket_price' => (string) $flight['ticket_price'],
+                'remaining_seats' => (string) $flight['remaining_seats'],
+                'origin_iata_code' => (string) $flight['origin_iata_code'],
+                'origin_city' => (string) $flight['origin_city'],
+                'destination_iata_code' => (string) $flight['destination_iata_code'],
+                'destination_city' => (string) $flight['destination_city'],
+            ],
+            $statement->fetchAll()
+        );
+    }
+
+    /**
+     * @return list<array{
+     *     id: string,
+     *     flight_number: string,
+     *     departure_at: string,
+     *     arrival_at: string,
+     *     ticket_price: string,
+     *     remaining_seats: string,
+     *     origin_iata_code: string,
+     *     origin_city: string,
+     *     destination_iata_code: string,
+     *     destination_city: string
+     * }>
+     */
+    public function listUpcomingAvailableFlights(int $limit = 8): array
+    {
+        if ($limit < 1 || $limit > 30) {
+            throw new InvalidArgumentException('Upcoming flight limit is invalid.');
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT f.id, f.flight_number, f.departure_at, f.arrival_at, f.ticket_price,
+                    f.seat_capacity - COALESCE(occupancy.occupied_seats, 0) AS remaining_seats,
+                    origin.iata_code AS origin_iata_code, origin.city AS origin_city,
+                    destination.iata_code AS destination_iata_code,
+                    destination.city AS destination_city
+             FROM flights f
+             INNER JOIN airports origin ON origin.id = f.origin_airport_id
+             INNER JOIN airports destination ON destination.id = f.destination_airport_id
+             ' . self::AVAILABLE_SEATS_JOIN . '
+             WHERE f.departure_at > NOW()
+               AND f.status = \'scheduled\'
+               AND f.ticket_price > 0
+               AND f.seat_capacity > COALESCE(occupancy.occupied_seats, 0)
+             ORDER BY f.departure_at, f.flight_number
+             LIMIT :limit'
+        );
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->execute();
+
+        return array_map(
+            static fn (array $flight): array => [
+                'id' => (string) $flight['id'],
+                'flight_number' => (string) $flight['flight_number'],
+                'departure_at' => (string) $flight['departure_at'],
+                'arrival_at' => (string) $flight['arrival_at'],
+                'ticket_price' => (string) $flight['ticket_price'],
+                'remaining_seats' => (string) $flight['remaining_seats'],
+                'origin_iata_code' => (string) $flight['origin_iata_code'],
+                'origin_city' => (string) $flight['origin_city'],
+                'destination_iata_code' => (string) $flight['destination_iata_code'],
+                'destination_city' => (string) $flight['destination_city'],
+            ],
+            $statement->fetchAll()
+        );
     }
 
     /**

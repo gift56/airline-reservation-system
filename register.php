@@ -11,6 +11,7 @@ app_start_session();
 
 $pageTitle = 'Create your account';
 $pageDescription = 'Create a passenger account to use the airline reservation system.';
+$returnTo = app_booking_return_path($_GET['return_to'] ?? null);
 $fullName = '';
 $email = '';
 $errors = [];
@@ -24,6 +25,7 @@ try {
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    $returnTo = app_booking_return_path($_POST['return_to'] ?? null);
     $fullNameValue = $_POST['full_name'] ?? null;
     $emailValue = $_POST['email'] ?? null;
     $passwordValue = $_POST['password'] ?? null;
@@ -67,7 +69,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
                 $users->createPassenger($fullName, $email, $passwordHash);
                 app_set_flash('success', 'Your passenger account is ready. Sign in to continue.');
-                header('Location: login.php');
+                $loginUrl = 'login.php' . ($returnTo !== null ? '?return_to=' . rawurlencode($returnTo) : '');
+                header('Location: ' . $loginUrl);
                 exit;
             }
         } catch (PDOException $exception) {
@@ -88,83 +91,102 @@ require __DIR__ . '/includes/header.php';
 ?>
 <section class="container auth-section">
     <div class="row justify-content-center">
-        <div class="col-12 col-md-9 col-lg-6 col-xl-5">
+        <div class="col-12 col-md-10 col-xl-10">
             <div class="auth-card card border-0 shadow-sm">
-                <div class="card-body p-4 p-md-5">
-                    <p class="auth-eyebrow mb-2">Passenger account</p>
-                    <h1 class="h2 mb-2">Create your account</h1>
-                    <p class="text-secondary mb-4">Set up your details to get started with your airline account.</p>
+                <div class="row g-0">
+                    <div class="col-lg-4">
+                        <div class="auth-promo">
+                            <span class="auth-promo-mark"><i class="fa-solid fa-earth-africa" aria-hidden="true"></i></span>
+                            <div class="auth-promo-copy">
+                                <h2>Your next story is out there.</h2>
+                                <p>Create your passenger account and get ready to explore.</p>
+                            </div>
+                            <span class="auth-promo-note">A little less planning. A lot more looking forward.</span>
+                        </div>
+                    </div>
+                    <div class="col-lg-8">
+                        <div class="card-body p-4 p-md-5">
+                            <p class="auth-eyebrow mb-2">Passenger account</p>
+                            <h1 class="h2 mb-2">Create your account</h1>
+                            <p class="text-secondary mb-4">Set up your details to get started with your airline account.</p>
 
-                    <?php if ($errors !== []): ?>
-                        <div class="alert alert-danger" role="alert" aria-live="assertive">
-                            <ul class="mb-0 ps-3">
-                                <?php foreach ($errors as $error): ?>
-                                    <li><?= app_escape($error) ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                    <?php endif; ?>
+                            <?php if ($errors !== []): ?>
+                                <div class="alert alert-danger" role="alert" aria-live="assertive">
+                                    <ul class="mb-0 ps-3">
+                                        <?php foreach ($errors as $error): ?>
+                                            <li><?= app_escape($error) ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                            <?php endif; ?>
 
-                    <form method="post" action="register.php">
-                        <input type="hidden" name="csrf_token" value="<?= app_escape(app_csrf_token()) ?>">
-                        <div class="mb-3">
-                            <label for="full_name" class="form-label">Full name</label>
-                            <input
-                                type="text"
-                                class="form-control form-control-lg"
-                                id="full_name"
-                                name="full_name"
-                                value="<?= app_escape($fullName) ?>"
-                                maxlength="120"
-                                autocomplete="name"
-                                required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email address</label>
-                            <input
-                                type="email"
-                                class="form-control form-control-lg"
-                                id="email"
-                                name="email"
-                                value="<?= app_escape($email) ?>"
-                                maxlength="254"
-                                autocomplete="email"
-                                required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Password</label>
-                            <input
-                                type="password"
-                                class="form-control form-control-lg"
-                                id="password"
-                                name="password"
-                                minlength="8"
-                                maxlength="72"
-                                autocomplete="new-password"
-                                aria-describedby="passwordHelp"
-                                required>
-                            <div id="passwordHelp" class="form-text">Use at least 8 characters</div>
-                        </div>
-                        <div class="mb-4">
-                            <label for="password_confirmation" class="form-label">Confirm password</label>
-                            <input
-                                type="password"
-                                class="form-control form-control-lg"
-                                id="password_confirmation"
-                                name="password_confirmation"
-                                minlength="8"
-                                maxlength="72"
-                                autocomplete="new-password"
-                                required>
-                        </div>
-                        <button class="btn btn-primary btn-lg app-primary-button w-100" type="submit">
-                            Create passenger account
-                        </button>
-                    </form>
+                            <form method="post" action="register.php">
+                                <input type="hidden" name="csrf_token" value="<?= app_escape(app_csrf_token()) ?>">
+                                <?php if ($returnTo !== null): ?>
+                                    <input type="hidden" name="return_to" value="<?= app_escape($returnTo) ?>">
+                                <?php endif; ?>
+                                <div class="mb-3">
+                                    <label for="full_name" class="form-label">Full name</label>
+                                    <input
+                                        type="text"
+                                        class="form-control form-control-lg"
+                                        id="full_name"
+                                        name="full_name"
+                                        value="<?= app_escape($fullName) ?>"
+                                        maxlength="120"
+                                        autocomplete="name"
+                                        required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email address</label>
+                                    <input
+                                        type="email"
+                                        class="form-control form-control-lg"
+                                        id="email"
+                                        name="email"
+                                        value="<?= app_escape($email) ?>"
+                                        maxlength="254"
+                                        autocomplete="email"
+                                        required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Password</label>
+                                    <input
+                                        type="password"
+                                        class="form-control form-control-lg"
+                                        id="password"
+                                        name="password"
+                                        minlength="8"
+                                        maxlength="72"
+                                        autocomplete="new-password"
+                                        aria-describedby="passwordHelp"
+                                        required>
+                                    <div id="passwordHelp" class="form-text">Use at least 8 characters</div>
+                                </div>
+                                <div class="mb-4">
+                                    <label for="password_confirmation" class="form-label">Confirm password</label>
+                                    <input
+                                        type="password"
+                                        class="form-control form-control-lg"
+                                        id="password_confirmation"
+                                        name="password_confirmation"
+                                        minlength="8"
+                                        maxlength="72"
+                                        autocomplete="new-password"
+                                        required>
+                                </div>
+                                <button class="btn btn-primary btn-lg app-primary-button w-100" type="submit">
+                                    Create passenger account
+                                </button>
+                            </form>
 
-                    <p class="text-center text-secondary mt-4 mb-0">
-                        Already registered? <a href="login.php">Sign in</a>
-                    </p>
+                            <p class="text-center text-secondary mt-4 mb-0">
+                                Already registered? <a href="<?= app_escape(
+                                    'login.php' . ($returnTo !== null ? '?return_to=' . rawurlencode($returnTo) : '')
+                                ) ?>">Sign in</a>
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
