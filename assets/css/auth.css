@@ -1,0 +1,89 @@
+:root {
+    --airline-navy: #17324d;
+    --airline-blue: #176b87;
+    --airline-canvas: #f3f6fa;
+    --airline-border: #dce5ed;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--airline-canvas);
+    color: var(--airline-navy);
+}
+
+.app-navbar {
+    background: #fff;
+    border-bottom: 1px solid var(--airline-border);
+}
+
+.navbar-brand {
+    color: var(--airline-navy);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.app-primary-button {
+    --bs-btn-bg: var(--airline-blue);
+    --bs-btn-border-color: var(--airline-blue);
+    --bs-btn-hover-bg: #11566d;
+    --bs-btn-hover-border-color: #11566d;
+    --bs-btn-active-bg: #0e4b60;
+    --bs-btn-active-border-color: #0e4b60;
+}
+
+.app-role-badge {
+    background: #e7f2f5;
+    color: #124e61;
+    font-weight: 600;
+}
+
+.app-logout-button {
+    --bs-btn-color: var(--airline-blue);
+    --bs-btn-border-color: var(--airline-blue);
+    --bs-btn-hover-bg: var(--airline-blue);
+    --bs-btn-hover-border-color: var(--airline-blue);
+}
+
+.page-main {
+    flex: 1;
+}
+
+.auth-section {
+    padding-top: clamp(2.5rem, 8vh, 5rem);
+    padding-bottom: clamp(2.5rem, 8vh, 5rem);
+}
+
+.auth-card {
+    border-radius: 1rem;
+}
+
+.auth-card .form-control {
+    border-color: var(--airline-border);
+    border-radius: 0.65rem;
+}
+
+.auth-card .form-control:focus {
+    border-color: var(--airline-blue);
+    box-shadow: 0 0 0 0.25rem rgb(23 107 135 / 18%);
+}
+
+.auth-eyebrow {
+    color: var(--airline-blue);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.app-footer {
+    background: #fff;
+    border-top: 1px solid var(--airline-border);
+    color: #526579;
+    font-size: 0.9rem;
+}
+
+a {
+    color: #125f79;
+}

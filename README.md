@@ -1,8 +1,8 @@
 # Airline Reservation System
 
-A PHP and MariaDB project scaffold for an airline reservation system. The current repository provides the database foundation and its documentation: a PDO connection entry point, a MySQL/MariaDB schema for accounts, airports, scheduled flights, bookings, and passenger manifests, and an ERD.
+A PHP and MariaDB project scaffold for an airline reservation system. The repository provides a PDO connection entry point, a MySQL/MariaDB schema for accounts, airports, scheduled flights, bookings, and passenger manifests, an ERD, and passenger registration/login with shared Bootstrap account UI.
 
-> **Current status:** The database schema has been imported successfully into the author's local XAMPP MariaDB setup. The passenger-facing website and admin portal are not implemented yet. There are currently no flight-search, registration/login, booking, booking-history, or flight-management pages to test.
+> **Current status:** The database schema has been imported successfully into the author's local XAMPP MariaDB setup. Passenger registration/login and shared account UI are implemented. Flight search, booking, booking history, and flight-management pages are not implemented yet.
 
 ## Contents
 
@@ -13,6 +13,7 @@ A PHP and MariaDB project scaffold for an airline reservation system. The curren
 - [Configure PHP database credentials](#configure-php-database-credentials)
 - [Test the PDO connection from PowerShell](#test-the-pdo-connection-from-powershell)
 - [Verify the database](#verify-the-database)
+- [Authentication and sessions](#authentication-and-sessions)
 - [Re-import behavior and safety](#re-import-behavior-and-safety)
 - [Troubleshooting](#troubleshooting)
 - [Current project limitations](#current-project-limitations)
@@ -89,7 +90,7 @@ The target XAMPP MariaDB 10.11.16 server rejected the attempted flight `CHECK` c
 
 ## Configure PHP database credentials
 
-[`config/db.php`](./config/db.php) reads these variables using PHP's `getenv()`:
+[`config/db.php`](./config/db.php) loads `DB_HOST`, `DB_NAME`, `DB_USER`, and `DB_PASS` from a project-root `.env` file. Process environment values, if configured, take precedence.
 
 | Variable | Local example | Purpose |
 |---|---|---|
@@ -98,7 +99,14 @@ The target XAMPP MariaDB 10.11.16 server rejected the attempted flight `CHECK` c
 | `DB_USER` | `airline_app` | MariaDB application account |
 | `DB_PASS` | Set to your account's actual non-empty password | MariaDB account password |
 
-**A `.env` file at the project root is not automatically read.** This project has no dotenv loader or Composer dependency. Make the variables available to the PHP process that needs them. For browser requests, configure the environment for Apache/PHP using your local Windows/XAMPP setup and restart Apache after changing it. Variables set only in a PowerShell window are available to CLI commands launched from that window; they do not configure Apache.
+To configure a local XAMPP setup:
+
+1. Copy `.env.example` in the project root to a new file named `.env`.
+2. Replace its placeholder values with the host, database name, username, and password for your MariaDB account.
+3. Keep `.env` local; Git ignores it. Never paste real credentials into source code, README, screenshots, or chat.
+4. Reload the page. The PHP configuration reads `.env` on each request; an Apache restart is not normally needed after editing it.
+
+The project uses a small built-in PHP parser; it does not execute `.env` as PHP or require Composer. Blank lines and comments are supported; values may be unquoted or surrounded by single/double quotes. Use quotes for values with spaces or inline comment markers. Environment variables already supplied by Apache/PHP override `.env`. The project [`.htaccess`](./.htaccess) blocks HTTP access to `.env` and `.env.*` files; do not remove this protection. The committed `.env.example` contains placeholders only.
 
 For local development, avoid using the database administrator account in the application. In phpMyAdmin, while signed in as an administrator, create a dedicated account with a non-empty local password (replace the example password before running this SQL):
 
@@ -110,27 +118,20 @@ GRANT SELECT, INSERT, UPDATE, DELETE
     TO 'airline_app'@'127.0.0.1';
 ```
 
-Run the `CREATE USER` statement only once; if the account already exists, use that account or update its password deliberately. Never commit the real password. The current [`config/db.php`](./config/db.php) requires `DB_PASS` to be present. On Windows, assigning an empty value to a PowerShell environment variable removes it, and PHP then sees `getenv('DB_PASS')` as missing. Use a database account with a non-empty password for this configuration.
+Run the `CREATE USER` statement only once; if the account already exists, use that account or update its password deliberately. Never commit the real password. A local XAMPP installation may have a different account setup; configure the credentials that work for your server.
 
 The current PDO DSN uses the default MySQL port because `config/db.php` has no `DB_PORT` setting. If your server uses a non-default port, update the connection configuration deliberately rather than only changing the XAMPP Control Panel's display/default port setting.
 
-## Test the PDO connection from PowerShell
+## Test the PDO connection
 
-Open PowerShell in the project root (`C:\xampp\htdocs\airline-reservation-system`) and set temporary environment variables for that terminal. Adjust the username/password to match your local server:
+After creating and configuring the root `.env`, open PowerShell in the project directory and run:
 
 ```powershell
-$env:DB_HOST = '127.0.0.1'
-$env:DB_NAME = 'airline_reservation'
-$env:DB_USER = 'airline_app'
-$env:DB_PASS = 'replace_with_the_password_you_created'
-
 & 'C:\xampp\php\php.exe' -m | Select-String '^(PDO|pdo_mysql)$'
 & 'C:\xampp\php\php.exe' -r "require 'config/db.php'; echo 'PDO connection OK', PHP_EOL;"
 ```
 
-Replace the example password with the non-empty password you chose. The first command should list both `PDO` and `pdo_mysql`. The second should print `PDO connection OK` if the CLI PHP runtime can connect with the supplied values. An exception indicates a missing environment variable, a database/credential/host issue, or a missing PHP extension; read the message and check the matching runtime configuration.
-
-These assignments are temporary and apply only to this PowerShell process and its child commands. This test checks **CLI PHP**, not whether Apache has the same environment variables. Do not create a publicly accessible diagnostic page that prints credentials.
+The first command should list both `PDO` and `pdo_mysql`. The second should print `PDO connection OK` if CLI PHP can connect using `.env`. This tests CLI PHP; browser requests use Apache's PHP runtime, but both load the same project `.env`. An exception names a missing setting or reports a database/credential/host issue; it never includes credential values. Do not create a publicly accessible diagnostic page that prints credentials.
 
 ## Verify the database
 
@@ -144,6 +145,17 @@ SHOW TRIGGERS LIKE 'flights';
 Confirm that the five expected tables and both flight validation triggers are present. On the table **Structure** pages, inspect primary/unique keys, indexes, and foreign keys; compare them with [`docs/database-erd.md`](./docs/database-erd.md).
 
 The import has also been tested against a disposable MariaDB 10.11.16 database, including repeat import and rejection of invalid flight inserts/updates. That does not replace checking the import and connection on each developer's own local installation.
+
+## Authentication and sessions
+
+With Apache and MariaDB running and the `DB_*` values configured for Apache/PHP, open:
+
+- Registration: [http://localhost/airline-reservation-system/register.php](http://localhost/airline-reservation-system/register.php)
+- Sign in: [http://localhost/airline-reservation-system/login.php](http://localhost/airline-reservation-system/login.php)
+
+Public registration creates passenger accounts only. Passwords must contain at least 8 characters and are limited to 72 UTF-8 bytes; they are stored with PHP's `password_hash()` and login verifies them with `password_verify()`. Forms use CSRF tokens, and successful login regenerates the session ID. The shared header, navbar, and footer are in [`includes/`](./includes/); session and CSRF helpers are in [`config/session.php`](./config/session.php).
+
+The login page accepts both `passenger` and `admin` accounts, but there is intentionally no public admin signup. Admin accounts must be provisioned by a trusted operator through a secure, non-public process and use a `password_hash()` value; do not store passwords or hashes in source control. The navbar reflects the authenticated role, but booking and admin-management pages are not implemented yet.
 
 ## Re-import behavior and safety
 
@@ -178,4 +190,4 @@ Read the database server's complete error under **MySQL said**. phpMyAdmin's sta
 
 ## Current project limitations
 
-This repository currently contains the database/schema foundation and PDO connection setup. The product features listed in [`AGENTS.md`](./AGENTS.md)—flight search, passenger registration/login, reservations, booking history, and admin flight/reservation pages—remain future implementation work. The root URL `http://localhost/airline-reservation-system/` is not yet a completed application entry point.
+This repository currently contains the database/schema foundation, PDO connection setup, and passenger registration/login with role-aware sessions. The product features listed in [`AGENTS.md`](./AGENTS.md)—flight search, reservations, booking history, and admin flight/reservation pages—remain future implementation work. The root URL `http://localhost/airline-reservation-system/` is not yet a completed application entry point.
