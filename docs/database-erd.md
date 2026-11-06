@@ -9,6 +9,9 @@ erDiagram
     AIRPORTS ||--o{ FLIGHTS : origin
     AIRPORTS ||--o{ FLIGHTS : destination
     BOOKINGS ||--o{ PASSENGERS_MANIFEST : includes
+    BOOKINGS ||--o{ BOOKING_SEAT_ASSIGNMENTS : assigns
+    PASSENGERS_MANIFEST ||--o| BOOKING_SEAT_ASSIGNMENTS : receives
+    FLIGHTS ||--o{ BOOKING_SEAT_ASSIGNMENTS : offers
 
     USERS {
         bigint id PK
@@ -40,6 +43,7 @@ erDiagram
         string booking_reference UK
         bigint user_id FK
         bigint flight_id FK
+        decimal ticket_price "fare snapshot; nullable for legacy bookings"
         enum status
     }
     PASSENGERS_MANIFEST {
@@ -47,6 +51,13 @@ erDiagram
         bigint booking_id FK
         string first_name
         string last_name
+    }
+    BOOKING_SEAT_ASSIGNMENTS {
+        bigint id PK
+        bigint flight_id FK
+        bigint booking_id FK
+        bigint manifest_id FK, UK
+        string seat_label
     }
 ```
 
@@ -72,7 +83,15 @@ erDiagram
 | `bookings.user_id` → `users.id` | `RESTRICT` | `CASCADE` | Preserve booking history if an account is referenced. |
 | `bookings.flight_id` → `flights.id` | `RESTRICT` | `CASCADE` | Preserve bookings if a flight is referenced. |
 | `passengers_manifest.booking_id` → `bookings.id` | `CASCADE` | `CASCADE` | Manifest rows are dependent details of a booking. |
+| `booking_seat_assignments.flight_id` → `flights.id` | `RESTRICT` | `CASCADE` | Keep seat assignment history attached to a flight. |
+| `booking_seat_assignments.booking_id` → `bookings.id` | `CASCADE` | `CASCADE` | Remove seat assignments with their booking. |
+| `booking_seat_assignments.manifest_id` → `passengers_manifest.id` | `CASCADE` | `CASCADE` | Keep each seat assignment linked to one passenger. |
 
 Schema source: [`../database/schema.sql`](../database/schema.sql).
 
 The PHP runtime must have both `PDO` and `pdo_mysql` enabled to use [`../config/db.php`](../config/db.php).
+
+- New reservations store a fare snapshot in `bookings.ticket_price`; legacy rows remain `NULL` because their original fare cannot be reliably reconstructed.
+- `booking_seat_assignments` stores the selected seat for a manifest traveler. Its unique `(flight_id, seat_label)` key prevents two assignments from claiming the same seat; the unique `manifest_id` key allows no more than one seat per traveler. Booking creation also verifies that the assignment's booking and manifest belong to the same flight/booking within the transaction.
+- Seat labels are generated from each flight's capacity in six-seat rows (`A`–`F`). Existing active reservations without seat assignments still consume capacity; the booking model marks corresponding unassigned seats unavailable.
+- Apply [`../database/migrations/07-booking-seats-and-fare-snapshot.sql`](../database/migrations/07-booking-seats-and-fare-snapshot.sql) to an existing database after confirming the live database engine/version. It adds one nullable fare snapshot column and creates the seat-assignment table without dropping or rewriting existing records. Validate the target's resulting keys and foreign keys after import.

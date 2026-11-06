@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use DomainException;
 use InvalidArgumentException;
 use PDO;
+use Throwable;
 
 final class Flight
 {
@@ -497,33 +499,95 @@ final class Flight
         int $seatCapacity,
         string $ticketPrice
     ): bool {
-        $statement = $this->pdo->prepare(
-            'UPDATE flights
-             SET flight_number = :flight_number,
-                 origin_airport_id = :origin_airport_id,
-                 destination_airport_id = :destination_airport_id,
-                 departure_at = :departure_at,
-                 arrival_at = :arrival_at,
-                 seat_capacity = :seat_capacity,
-                 ticket_price = :ticket_price
-             WHERE id = :id'
-        );
-        $statement->execute([
-            'id' => $id,
-            'flight_number' => $flightNumber,
-            'origin_airport_id' => $originAirportId,
-            'destination_airport_id' => $destinationAirportId,
-            'departure_at' => $departureAt,
-            'arrival_at' => $arrivalAt,
-            'seat_capacity' => $seatCapacity,
-            'ticket_price' => $ticketPrice,
-        ]);
-
-        if ($statement->rowCount() > 0) {
-            return true;
+        if ($id < 1 || $seatCapacity < 1) {
+            throw new InvalidArgumentException('Flight update values are invalid.');
         }
 
-        return $this->findById($id) !== null;
+        $this->pdo->beginTransaction();
+
+        try {
+            $lockFlight = $this->pdo->prepare('SELECT id FROM flights WHERE id = :id FOR UPDATE');
+            $lockFlight->execute(['id' => $id]);
+            if ($lockFlight->fetchColumn() === false) {
+                $this->pdo->commit();
+
+                return false;
+            }
+
+            $occupancyStatement = $this->pdo->prepare(
+                'SELECT COALESCE(
+                    SUM(GREATEST(COALESCE(manifest.passenger_count, 0), 1)),
+                    0
+                 )
+                 FROM bookings
+                 LEFT JOIN (
+                     SELECT booking_id, COUNT(*) AS passenger_count
+                     FROM passengers_manifest
+                     GROUP BY booking_id
+                 ) manifest ON manifest.booking_id = bookings.id
+                 WHERE bookings.flight_id = :flight_id
+                   AND bookings.status IN (\'pending\', \'confirmed\')'
+            );
+            $occupancyStatement->execute(['flight_id' => $id]);
+            if ((int) $occupancyStatement->fetchColumn() > $seatCapacity) {
+                throw new DomainException('Seat capacity cannot be lower than the number of active reservations.');
+            }
+
+            $assignmentStatement = $this->pdo->prepare(
+                'SELECT assignment.seat_label
+                 FROM booking_seat_assignments assignment
+                 INNER JOIN bookings ON bookings.id = assignment.booking_id
+                 WHERE assignment.flight_id = :flight_id
+                   AND bookings.status IN (\'pending\', \'confirmed\')'
+            );
+            $assignmentStatement->execute(['flight_id' => $id]);
+            foreach ($assignmentStatement->fetchAll(PDO::FETCH_COLUMN) as $seatLabel) {
+                $seatIndex = is_string($seatLabel) ? self::seatIndex($seatLabel) : null;
+                if ($seatIndex === null || $seatIndex >= $seatCapacity) {
+                    throw new DomainException('Seat capacity cannot exclude a seat already assigned to a passenger.');
+                }
+            }
+
+            $statement = $this->pdo->prepare(
+                'UPDATE flights
+                 SET flight_number = :flight_number,
+                     origin_airport_id = :origin_airport_id,
+                     destination_airport_id = :destination_airport_id,
+                     departure_at = :departure_at,
+                     arrival_at = :arrival_at,
+                     seat_capacity = :seat_capacity,
+                     ticket_price = :ticket_price
+                 WHERE id = :id'
+            );
+            $statement->execute([
+                'id' => $id,
+                'flight_number' => $flightNumber,
+                'origin_airport_id' => $originAirportId,
+                'destination_airport_id' => $destinationAirportId,
+                'departure_at' => $departureAt,
+                'arrival_at' => $arrivalAt,
+                'seat_capacity' => $seatCapacity,
+                'ticket_price' => $ticketPrice,
+            ]);
+            $this->pdo->commit();
+
+            return true;
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            throw $exception;
+        }
+    }
+
+    private static function seatIndex(string $label): ?int
+    {
+        if (preg_match('/\A([1-9][0-9]{0,4})([A-F])\z/', $label, $matches) !== 1) {
+            return null;
+        }
+
+        return (((int) $matches[1]) - 1) * 6 + ord($matches[2]) - 65;
     }
 
     public function delete(int $id): bool

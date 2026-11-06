@@ -50,9 +50,27 @@ function app_is_valid_csrf_token(mixed $token): bool
         && hash_equals($_SESSION['_csrf_token'], $token);
 }
 
+function app_booking_status_class(mixed $status): string
+{
+    return match ($status) {
+        'pending' => 'booking-status-pending',
+        'confirmed' => 'booking-status-confirmed',
+        'cancelled' => 'booking-status-cancelled',
+        default => 'booking-status-unknown',
+    };
+}
+
 function app_booking_return_path(mixed $value): ?string
 {
-    if (!is_string($value) || preg_match('/\Abook-flight\.php\?flight_id=([1-9][0-9]*)\z/', $value, $matches) !== 1) {
+    if (!is_string($value)) {
+        return null;
+    }
+
+    if ($value === 'my-bookings.php') {
+        return $value;
+    }
+
+    if (preg_match('/\Abook-flight\.php\?flight_id=([1-9][0-9]*)\z/', $value, $matches) !== 1) {
         return null;
     }
 

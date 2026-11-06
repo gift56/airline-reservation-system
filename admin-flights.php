@@ -384,6 +384,8 @@ try {
         $requestedPage,
         $pageSize
     );
+} catch (DomainException $exception) {
+    $errors[] = $exception->getMessage();
 } catch (PDOException $exception) {
     $driverCode = isset($exception->errorInfo[1]) ? (int) $exception->errorInfo[1] : 0;
 

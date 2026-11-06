@@ -1,0 +1,6 @@
+{
+    "require": {
+        "php": ">=8.0",
+        "setasign/fpdf": "^1.8"
+    }
+}

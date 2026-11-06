@@ -33,6 +33,8 @@ $navUser = app_current_user();
                     </span>
                     <?php if ($navUser['role'] === 'admin'): ?>
                         <a class="nav-link" href="admin-flights.php#flight-list"><i class="fa-solid fa-sliders me-2" aria-hidden="true"></i>Manage flights</a>
+                    <?php else: ?>
+                        <a class="nav-link" href="my-bookings.php"><i class="fa-solid fa-ticket me-2" aria-hidden="true"></i>My bookings</a>
                     <?php endif; ?>
                     <form method="post" action="logout.php" class="ms-lg-2">
                         <input type="hidden" name="csrf_token" value="<?= app_escape(app_csrf_token()) ?>">

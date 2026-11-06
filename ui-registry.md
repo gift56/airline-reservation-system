@@ -85,3 +85,45 @@ Last updated: 2026-11-06
 
 **Pattern notes:**
 Use the shared flight card for both upcoming flights and search results. Keep itinerary details, seat availability, per-traveler fare, and the clearly labeled booking action together. Booking panels stack into one column on mobile. Show semantic, escaped feedback and explicitly identify reservations as pending; never suggest payment or ticket confirmation.
+
+### Multi-step booking and reservation ticket
+
+Files: `book-flight.php`, `ticket.php`, `assets/css/flight-search.css`
+Last updated: 2026-11-06
+
+| Property | Pattern |
+|---|---|
+| Background | White booking/ticket panels on `--flight-canvas` |
+| Border | `1px solid var(--flight-line)`; dashed violet booking reference |
+| Border radius | `1rem` panels; `0.45rem` seat controls |
+| Text — primary | `--flight-ink` |
+| Text — secondary | `--flight-muted` and Bootstrap `text-secondary` |
+| Spacing | Bootstrap responsive grid; `clamp()` panel padding |
+| Hover/focus state | Violet border and visible `rgb(101 73 232 / 17%)` focus ring |
+| Shadow | Soft booking-panel shadow; no shadow in print |
+| Accent usage | Violet for current/completed steps and selected seats; pending amber, confirmed green, cancelled red; unavailable seats use neutral fill plus disabled/text state |
+
+**Pattern notes:**
+Use a labeled three-step indicator, keyboard-operable seat controls with visible text states, and a concise itinerary summary. On the ticket, show departure above arrival with a vertical connector and airplane marker. Keep panels stacked on mobile. Print output hides navigation and actions and removes decorative shadows. Reservation status and the no-payment/no-boarding-pass disclaimer must remain explicit in both screen and print layouts; color alone must never communicate seat state.
+
+### Passenger dashboard and My Bookings
+
+Files: `my-bookings.php`, `assets/css/flight-search.css`
+Last updated: 2026-11-06
+
+| Property | Pattern |
+|---|---|
+| Background | `--flight-canvas` with a restrained violet radial wash |
+| Surface | White booking cards and summary panels with soft shadows |
+| Border | `1px solid var(--flight-line)` |
+| Border radius | `1rem` panels and cards; pill reservation status |
+| Text — primary | `--flight-ink` |
+| Text — secondary | `--flight-muted` |
+| Accent | `--flight-purple`; pending amber, confirmed green, and cancelled red status badges; deep red text for the destructive cancel action |
+| Spacing | Responsive Bootstrap grid and `clamp()` heading/card padding |
+| Focus | Bootstrap visible focus treatment; text labels remain explicit |
+| Shadow | Soft `0 0.45rem 1.5rem rgb(28 27 47 / 4–5%)` |
+| Typography | Bootstrap system stack; tracked uppercase eyebrow and compact bold route labels |
+
+**Pattern notes:**
+Use a responsive summary row and itinerary cards with route, schedule, status, booking reference, traveler/seat details, and clearly labeled ticket actions. Stack summary panels and action buttons on narrow screens. Pending, confirmed, and cancelled status colors are amber, green, and red respectively, always paired with visible status text. Keep cancellation visually secondary but clearly destructive, and require a server-validated POST with CSRF protection.

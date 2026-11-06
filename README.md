@@ -2,7 +2,7 @@
 
 A PHP and MariaDB project scaffold for an airline reservation system. The repository provides a PDO connection entry point, a MySQL/MariaDB schema for accounts, airports, scheduled flights, bookings, and passenger manifests, an ERD, and passenger registration/login with shared Bootstrap account UI.
 
-> **Current status:** The database schema, passenger registration/login, public flight search, passenger pending reservations, shared account UI, and administrator flight CRUD dashboard are implemented. Booking history and online payment are not implemented.
+> **Current status:** The database schema, passenger registration/login, public flight search, multi-step passenger reservations with seat assignments and printable/PDF tickets, passenger upcoming-bookings dashboard and cancellation, shared account UI, and administrator flight CRUD dashboard are implemented. Past/cancelled booking history and online payment are not implemented.
 
 ## Contents
 
@@ -15,6 +15,8 @@ A PHP and MariaDB project scaffold for an airline reservation system. The reposi
 - [Verify the database](#verify-the-database)
 - [Authentication and sessions](#authentication-and-sessions)
 - [Public flight search and passenger reservations](#public-flight-search-and-passenger-reservations)
+- [Booking seat and ticket migration](#booking-seat-and-ticket-migration)
+- [Passenger dashboard and reservation cancellation](#passenger-dashboard-and-reservation-cancellation)
 - [Admin flight dashboard](#admin-flight-dashboard)
 - [Re-import behavior and safety](#re-import-behavior-and-safety)
 - [Troubleshooting](#troubleshooting)
@@ -50,12 +52,13 @@ For a fresh local setup:
 1. In phpMyAdmin, select **New**.
 2. Create a database named `airline_reservation` with an `utf8mb4` collation such as `utf8mb4_unicode_ci`.
 3. Select `airline_reservation`, open **Import**, and choose [`database/schema.sql`](./database/schema.sql).
-4. Run the import and confirm these five tables appear:
+4. Run the import and confirm these six tables appear:
    - `users`
    - `airports`
    - `flights`
    - `bookings`
    - `passengers_manifest`
+   - `booking_seat_assignments`
 5. In phpMyAdmin's SQL tab, run:
 
    ```sql
@@ -75,8 +78,9 @@ The schema source is [`database/schema.sql`](./database/schema.sql); the entity 
 | `users` | Passenger or admin account identity and password hash |
 | `airports` | Unique IATA code and airport name/location |
 | `flights` | A scheduled flight occurrence, airport references, schedule, capacity, ticket price, and status |
-| `bookings` | Account holder, scheduled flight, booking reference, and status |
+| `bookings` | Account holder, scheduled flight, booking reference, fare snapshot, and status |
 | `passengers_manifest` | Traveler names attached to a booking; manifest travelers are not necessarily user accounts |
+| `booking_seat_assignments` | Unique per-flight seat assigned to a passenger manifest row |
 
 Relationships: an airport can be the origin or destination for many flights; a user can place many bookings; a flight can have many bookings; and a booking can have multiple manifest travelers.
 
@@ -145,7 +149,7 @@ SHOW TABLES;
 SHOW TRIGGERS LIKE 'flights';
 ```
 
-Confirm that the five expected tables and both flight validation triggers are present. On the table **Structure** pages, inspect primary/unique keys, indexes, and foreign keys; compare them with [`docs/database-erd.md`](./docs/database-erd.md).
+Confirm that the six expected tables and both flight validation triggers are present. On the table **Structure** pages, inspect primary/unique keys, indexes, and foreign keys; compare them with [`docs/database-erd.md`](./docs/database-erd.md).
 
 The import has also been tested against a disposable MariaDB 10.11.16 database, including repeat import and rejection of invalid flight inserts/updates. That does not replace checking the import and connection on each developer's own local installation.
 
@@ -180,13 +184,23 @@ The admin flight list shows 10 flights per page with a result range and accessib
 
 The public landing page lists upcoming scheduled flights with a positive fare and available seats. Visitors can filter flights by route, date, fare, and time. Flight cards show fares in Nigerian naira (`₦`).
 
-Selecting **Book flight** opens a reservation form. A passenger must sign in (or register and then sign in) to reserve 1–6 travelers; the selected flight is retained through that flow. Reservations are saved with `pending` status and one passenger-manifest row per traveler. Seat capacity is checked again inside a transaction before the reservation is created.
+Selecting **Book flight** opens a three-step reservation flow: enter details for 1–6 travelers, select a seat for each traveler, and review and confirm. A passenger must sign in (or register and then sign in); the selected flight is retained through that flow. Final confirmation saves a `pending` booking, one passenger-manifest row and one seat assignment per traveler, and a fare snapshot in a PDO transaction. Remaining capacity is derived from active reservations rather than stored as a separate counter.
 
-This is a reservation request only: the application does not collect payment details, charge a card, or issue a paid/confirmed ticket. Booking history and online payment are not currently implemented.
+The confirmation provides a printable reservation ticket page and a downloadable PDF. The reservation remains pending: the application does not collect payment details, charge a card, or issue a paid/confirmed ticket or boarding pass.
+
+### Booking seat and ticket migration
+
+For an existing database, confirm the live MariaDB/MySQL engine and version, then import [`database/migrations/07-booking-seats-and-fare-snapshot.sql`](./database/migrations/07-booking-seats-and-fare-snapshot.sql) in phpMyAdmin. The additive migration adds a nullable fare snapshot to `bookings` and creates `booking_seat_assignments`; it preserves existing bookings and manifests. Legacy fares stay `NULL`, and legacy active reservations without seat assignments still consume capacity and display as unavailable seats. Verify the new table, unique keys, and foreign keys after import.
+
+The application uses Composer's `setasign/fpdf` library to generate actual PDF files. Run `composer install` from the project root after checking out the code. Composer needs the PHP `zip` extension or an `unzip`/7-Zip executable to unpack the dependency archives. Flight seats are shown in six-seat rows labelled A–F, limited by each flight's configured capacity. The admin dashboard prevents lowering a flight's capacity below active reservations or assigned seats.
+
+### Passenger dashboard and reservation cancellation
+
+Signed-in passengers can open **My bookings** from the navbar to review upcoming pending or confirmed reservations, traveler and seat details, and saved fares. Each booking links to the existing owner-protected printable ticket and PDF download. Passengers can cancel their own upcoming reservations before departure; cancellation marks the booking `cancelled`, retains its booking and manifest records, and releases its seat assignments for reuse. The dashboard does not display past or canceled bookings as booking history.
 
 ## Re-import behavior and safety
 
-The schema uses `CREATE TABLE IF NOT EXISTS` so it can fill in missing tables in the current partial setup without dropping existing tables or rows. On the verified MariaDB 10.11.16 target, it also uses `ADD COLUMN IF NOT EXISTS` for `flights.ticket_price` before dropping and recreating its two named validation triggers. Other differences between a pre-existing table and the schema are not automatically reconciled.
+The schema uses `CREATE TABLE IF NOT EXISTS` so it can fill in missing tables in the current partial setup without dropping existing tables or rows. On the verified MariaDB 10.11.16 target, it also uses `ADD COLUMN IF NOT EXISTS` for `flights.ticket_price` and `bookings.ticket_price` before dropping and recreating its two named flight-validation triggers. Other differences between a pre-existing table and the schema are not automatically reconciled.
 
 `CREATE TABLE IF NOT EXISTS` does **not** update or repair a table that already exists with a different structure. This script does not drop the database or tables. Do not delete the database as an import troubleshooting step unless you have intentionally backed up and chosen to reset your local data.
 
@@ -217,4 +231,4 @@ Read the database server's complete error under **MySQL said**. phpMyAdmin's sta
 
 ## Current project limitations
 
-This repository currently contains the database/schema foundation, PDO connection setup, passenger registration/login with role-aware sessions, public flight search and pending reservations, and administrator flight management. Booking history and online payment remain future implementation work.
+This repository currently contains the database/schema foundation, PDO connection setup, passenger registration/login with role-aware sessions, public flight search and pending reservations, the upcoming passenger booking dashboard with cancellation, and administrator flight management. Past/cancelled booking history and online payment remain future implementation work.
