@@ -56,7 +56,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     'full_name' => $user['full_name'],
                     'role' => $user['role'],
                 ]);
-                header('Location: login.php');
+                header('Location: ' . ($user['role'] === 'admin' ? 'admin-flights.php' : 'login.php'));
                 exit;
             }
         } catch (PDOException | RuntimeException $exception) {

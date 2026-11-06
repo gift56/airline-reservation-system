@@ -2,7 +2,7 @@
 
 A PHP and MariaDB project scaffold for an airline reservation system. The repository provides a PDO connection entry point, a MySQL/MariaDB schema for accounts, airports, scheduled flights, bookings, and passenger manifests, an ERD, and passenger registration/login with shared Bootstrap account UI.
 
-> **Current status:** The database schema has been imported successfully into the author's local XAMPP MariaDB setup. Passenger registration/login and shared account UI are implemented. Flight search, booking, booking history, and flight-management pages are not implemented yet.
+> **Current status:** The database schema, passenger registration/login, shared account UI, and administrator flight CRUD dashboard are implemented. Public flight search, booking, and booking history are not implemented yet.
 
 ## Contents
 
@@ -14,6 +14,7 @@ A PHP and MariaDB project scaffold for an airline reservation system. The reposi
 - [Test the PDO connection from PowerShell](#test-the-pdo-connection-from-powershell)
 - [Verify the database](#verify-the-database)
 - [Authentication and sessions](#authentication-and-sessions)
+- [Admin flight dashboard](#admin-flight-dashboard)
 - [Re-import behavior and safety](#re-import-behavior-and-safety)
 - [Troubleshooting](#troubleshooting)
 - [Current project limitations](#current-project-limitations)
@@ -72,7 +73,7 @@ The schema source is [`database/schema.sql`](./database/schema.sql); the entity 
 |---|---|
 | `users` | Passenger or admin account identity and password hash |
 | `airports` | Unique IATA code and airport name/location |
-| `flights` | A scheduled flight occurrence, airport references, schedule, capacity, and status |
+| `flights` | A scheduled flight occurrence, airport references, schedule, capacity, ticket price, and status |
 | `bookings` | Account holder, scheduled flight, booking reference, and status |
 | `passengers_manifest` | Traveler names attached to a booking; manifest travelers are not necessarily user accounts |
 
@@ -85,6 +86,7 @@ The schema uses `flights_validate_before_insert` and `flights_validate_before_up
 - Origin and destination airports must differ.
 - Arrival must be later than departure.
 - Seat capacity must be positive.
+- New and updated flights must have a positive ticket price; legacy flights may remain unset until edited.
 
 The target XAMPP MariaDB 10.11.16 server rejected the attempted flight `CHECK` constraints with error `#1901` (the `origin_airport_id` expression could not be used in that check). The schema retains the same validation using triggers rather than dropping the rules. Check the actual server's error message: phpMyAdmin's **Static analysis** warnings are separate from the server error shown under **MySQL said**.
 
@@ -155,11 +157,27 @@ With Apache and MariaDB running and the `DB_*` values configured for Apache/PHP,
 
 Public registration creates passenger accounts only. Passwords must contain at least 8 characters and are limited to 72 UTF-8 bytes; they are stored with PHP's `password_hash()` and login verifies them with `password_verify()`. Forms use CSRF tokens, and successful login regenerates the session ID. The shared header, navbar, and footer are in [`includes/`](./includes/); session and CSRF helpers are in [`config/session.php`](./config/session.php).
 
-The login page accepts both `passenger` and `admin` accounts, but there is intentionally no public admin signup. Admin accounts must be provisioned by a trusted operator through a secure, non-public process and use a `password_hash()` value; do not store passwords or hashes in source control. The navbar reflects the authenticated role, but booking and admin-management pages are not implemented yet.
+The login page accepts both `passenger` and `admin` accounts, but there is intentionally no public admin signup. Admin accounts must be provisioned by a trusted operator through a secure, non-public process and use a `password_hash()` value; do not store passwords or hashes in source control. The navbar reflects the authenticated role and shows the flight dashboard link only to admins.
+
+## Admin flight dashboard
+
+Sign in with a trusted admin account to open [http://localhost/airline-reservation-system/admin-flights.php](http://localhost/airline-reservation-system/admin-flights.php). The dashboard supports creating, viewing, editing, and deleting flights. Guests and passengers are redirected to sign in; only accounts whose stored role is `admin` can access the page.
+
+Flight origin and destination selections come from the existing `airports` table. No airport seed is required: on the admin dashboard, choose **Add airport** and enter its IATA code, airport name, city, and country. Add at least two airports before creating a flight. The **Add a flight** button opens the flight form in a modal. Fares are stored as `DECIMAL(10,2)`; existing flights have no known fare, so they remain `NULL` and display “Price not set” until an admin supplies a positive price.
+
+For an existing database, apply [`database/migrations/06-flight-ticket-price.sql`](./database/migrations/06-flight-ticket-price.sql) in phpMyAdmin against the project database. The additive migration is repeat-safe on the verified MariaDB 10.11.16 target, preserves existing flights and fares, and refreshes the two validation triggers. The updated [`database/schema.sql`](./database/schema.sql) also adds the column before refreshing triggers, so it remains safe to re-import on this MariaDB target. Do not drop tables or re-import to apply the fare change.
+
+Administrators can edit airport codes, names, cities, and countries from the Airports card. Deleting an airport also removes its related flights, but only when none of those flights has a booking. If any booking exists, the entire deletion is refused so reservation history is preserved. Deleting a flight that has bookings is also refused.
+
+### Optional Nigerian demo seed
+
+After confirming `flights.ticket_price` exists, you can optionally select `airline_reservation` in phpMyAdmin, choose **Import**, select [`database/seeds/nigeria-flights.sql`](./database/seeds/nigeria-flights.sql), and run it. The seed includes Nigerian airports and 12 fictional domestic flight examples with NGN fares, using fixed demo dates. It is repeat-safe, does not overwrite existing airport/flight records, and is not run automatically by the application. These schedules and fares are not real airline inventory. You can instead add only the airports and flights you need from the dashboard forms; seed import is optional.
+
+The admin flight list shows 10 flights per page with a result range and accessible page controls. Editing or deleting a flight preserves the current list page.
 
 ## Re-import behavior and safety
 
-The schema uses `CREATE TABLE IF NOT EXISTS` so it can fill in missing tables in the current partial setup without dropping existing tables or rows. It also drops and recreates only its two named flight-validation triggers so the trigger definitions can be refreshed.
+The schema uses `CREATE TABLE IF NOT EXISTS` so it can fill in missing tables in the current partial setup without dropping existing tables or rows. On the verified MariaDB 10.11.16 target, it also uses `ADD COLUMN IF NOT EXISTS` for `flights.ticket_price` before dropping and recreating its two named validation triggers. Other differences between a pre-existing table and the schema are not automatically reconciled.
 
 `CREATE TABLE IF NOT EXISTS` does **not** update or repair a table that already exists with a different structure. This script does not drop the database or tables. Do not delete the database as an import troubleshooting step unless you have intentionally backed up and chosen to reset your local data.
 
@@ -190,4 +208,4 @@ Read the database server's complete error under **MySQL said**. phpMyAdmin's sta
 
 ## Current project limitations
 
-This repository currently contains the database/schema foundation, PDO connection setup, and passenger registration/login with role-aware sessions. The product features listed in [`AGENTS.md`](./AGENTS.md)—flight search, reservations, booking history, and admin flight/reservation pages—remain future implementation work. The root URL `http://localhost/airline-reservation-system/` is not yet a completed application entry point.
+This repository currently contains the database/schema foundation, PDO connection setup, passenger registration/login with role-aware sessions, and administrator flight management. Public flight search, reservations, and booking history remain future implementation work. The root URL `http://localhost/airline-reservation-system/` is not yet a completed application entry point.

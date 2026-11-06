@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS
         departure_at DATETIME NOT NULL,
         arrival_at DATETIME NOT NULL,
         seat_capacity SMALLINT UNSIGNED NOT NULL,
+        ticket_price DECIMAL(10, 2) NULL,
         status ENUM ('scheduled', 'delayed', 'cancelled', 'completed') NOT NULL DEFAULT 'scheduled',
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -48,6 +49,9 @@ CREATE TABLE IF NOT EXISTS
     ) ENGINE = InnoDB DEFAULT CHARACTER
 SET
     = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+ALTER TABLE flights
+    ADD COLUMN IF NOT EXISTS ticket_price DECIMAL(10, 2) NULL AFTER seat_capacity;
 
 DROP TRIGGER IF EXISTS flights_validate_before_insert;
 DROP TRIGGER IF EXISTS flights_validate_before_update;
@@ -72,6 +76,11 @@ BEGIN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Seat capacity must be positive.';
     END IF;
+
+    IF NEW.ticket_price IS NULL OR NEW.ticket_price <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Ticket price must be positive.';
+    END IF;
 END//
 
 CREATE TRIGGER flights_validate_before_update
@@ -91,6 +100,11 @@ BEGIN
     IF NEW.seat_capacity = 0 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Seat capacity must be positive.';
+    END IF;
+
+    IF NEW.ticket_price IS NULL OR NEW.ticket_price <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Ticket price must be positive.';
     END IF;
 END//
 

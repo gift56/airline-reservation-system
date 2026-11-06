@@ -28,6 +28,9 @@ $navUser = app_current_user();
                     <span class="badge rounded-pill app-role-badge">
                         <?= $navUser['role'] === 'admin' ? 'Administrator' : 'Passenger' ?>
                     </span>
+                    <?php if ($navUser['role'] === 'admin'): ?>
+                        <a class="nav-link" href="admin-flights.php#flight-list">Manage flights</a>
+                    <?php endif; ?>
                     <form method="post" action="logout.php" class="ms-lg-2">
                         <input type="hidden" name="csrf_token" value="<?= app_escape(app_csrf_token()) ?>">
                         <button class="btn btn-outline-primary app-logout-button" type="submit">Sign out</button>
